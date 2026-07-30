@@ -44,9 +44,9 @@ product implementation.
 
 ## Prompt sequence
 
-Current implementation status: framework-light domain primitives and the Phase
-1 schema migrations are complete. Models, factories, policies, requests,
-actions, routes, and product workflows remain pending.
+Current implementation status: framework-light domain primitives, schema
+migrations, models, relationships, scopes, and factories are complete.
+Policies, requests, actions, routes, and product workflows remain pending.
 
 | Prompt | Scope and acceptance boundary                                                                                                                                                                                                      |
 | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -141,7 +141,7 @@ prompt:
 
 ```bash
 vendor/bin/pint --test
-vendor/bin/phpstan analyse --no-progress
+vendor/bin/phpstan analyse --no-progress --memory-limit=512M
 php artisan test
 npm run lint:check
 npm run format:check

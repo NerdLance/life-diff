@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\ProfileStatus;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
@@ -24,8 +25,10 @@ class UserFactory extends Factory
      */
     public function definition(): array
     {
+        $name = fake()->name();
+
         return [
-            'name' => fake()->name(),
+            'name' => $name,
             'email' => fake()->unique()->safeEmail(),
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
@@ -33,6 +36,11 @@ class UserFactory extends Factory
             'two_factor_secret' => null,
             'two_factor_recovery_codes' => null,
             'two_factor_confirmed_at' => null,
+            'handle' => fake()->unique()->bothify('user-####'),
+            'display_name' => $name,
+            'bio' => null,
+            'status' => ProfileStatus::Stable,
+            'timezone' => 'UTC',
         ];
     }
 
