@@ -39,10 +39,11 @@ class PublicProfileController extends Controller
         ];
     }
 
-    /** @return array{version: string, title: string, release_type: string, published_at: string|null, repository: array{name: string, slug: string}} */
+    /** @return array{public_id: string, version: string, title: string, release_type: string, published_at: string|null, repository: array{name: string, slug: string}} */
     private function releaseItem(Release $release): array
     {
         return [
+            'public_id' => $release->public_id,
             'version' => $release->version,
             'title' => $release->title,
             'release_type' => $release->release_type->value,

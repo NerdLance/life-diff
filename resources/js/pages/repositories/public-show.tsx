@@ -1,5 +1,6 @@
 import { Head, Link } from '@inertiajs/react';
 import { show as showPublicProfile } from '@/actions/App/Http/Controllers/PublicProfileController';
+import { show as showPublicRelease } from '@/actions/App/Http/Controllers/PublicReleaseController';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -9,10 +10,18 @@ import {
 import type { ProfileStatus, RepositoryVisibility } from '@/types';
 
 type Release = {
+    public_id: string;
     version: string;
     title: string;
     release_type: string;
     published_at: string | null;
+};
+type PaginatedReleases = {
+    data: Release[];
+    current_page: number;
+    last_page: number;
+    next_page_url: string | null;
+    prev_page_url: string | null;
 };
 
 export default function PublicRepository({
@@ -28,7 +37,7 @@ export default function PublicRepository({
         status: ProfileStatus;
         visibility: RepositoryVisibility;
     };
-    publishedReleases: Release[];
+    publishedReleases: PaginatedReleases;
 }) {
     return (
         <>
@@ -77,7 +86,7 @@ export default function PublicRepository({
                             Only public published releases appear here.
                         </p>
                     </div>
-                    {publishedReleases.length === 0 ? (
+                    {publishedReleases.data.length === 0 ? (
                         <Card>
                             <CardContent className="pt-6 text-sm text-muted-foreground">
                                 No public releases are available.
@@ -85,14 +94,21 @@ export default function PublicRepository({
                         </Card>
                     ) : (
                         <div className="divide-y rounded-lg border border-border">
-                            {publishedReleases.map((release) => (
+                            {publishedReleases.data.map((release) => (
                                 <article
                                     key={release.version}
                                     className="flex flex-wrap items-center justify-between gap-3 p-4"
                                 >
                                     <div>
                                         <h3 className="font-medium">
-                                            {release.title}
+                                            <Link
+                                                href={showPublicRelease(
+                                                    release.public_id,
+                                                )}
+                                                className="rounded-sm hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                                            >
+                                                {release.title}
+                                            </Link>
                                         </h3>
                                         <p className="text-sm text-muted-foreground">
                                             {release.release_type} ·{' '}
@@ -106,6 +122,35 @@ export default function PublicRepository({
                             ))}
                         </div>
                     )}
+                    {publishedReleases.last_page > 1 ? (
+                        <nav
+                            className="flex flex-wrap items-center justify-between gap-3"
+                            aria-label="Public release pages"
+                        >
+                            <p className="text-sm text-muted-foreground">
+                                Page {publishedReleases.current_page} of{' '}
+                                {publishedReleases.last_page}
+                            </p>
+                            <div className="flex gap-2">
+                                {publishedReleases.prev_page_url ? (
+                                    <Link
+                                        href={publishedReleases.prev_page_url}
+                                        className="rounded-md border border-input px-3 py-2 text-sm font-medium hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                                    >
+                                        Previous
+                                    </Link>
+                                ) : null}
+                                {publishedReleases.next_page_url ? (
+                                    <Link
+                                        href={publishedReleases.next_page_url}
+                                        className="rounded-md border border-input px-3 py-2 text-sm font-medium hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                                    >
+                                        Next
+                                    </Link>
+                                ) : null}
+                            </div>
+                        </nav>
+                    ) : null}
                 </section>
             </div>
         </>

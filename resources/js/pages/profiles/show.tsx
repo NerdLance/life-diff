@@ -1,4 +1,5 @@
 import { Head, Link } from '@inertiajs/react';
+import { show as showPublicRelease } from '@/actions/App/Http/Controllers/PublicReleaseController';
 import { show as showPublicRepository } from '@/actions/App/Http/Controllers/PublicRepositoryController';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -18,6 +19,7 @@ type Repository = {
     status: ProfileStatus;
 };
 type Release = {
+    public_id: string;
     version: string;
     title: string;
     release_type: string;
@@ -131,9 +133,14 @@ export default function PublicProfile({
                                     className="flex flex-wrap items-center justify-between gap-3 p-4"
                                 >
                                     <div>
-                                        <p className="font-medium">
+                                        <Link
+                                            href={showPublicRelease(
+                                                release.public_id,
+                                            )}
+                                            className="rounded-sm font-medium hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                                        >
                                             {release.title}
-                                        </p>
+                                        </Link>
                                         <p className="text-sm text-muted-foreground">
                                             {release.repository.name} ·{' '}
                                             {release.published_at}

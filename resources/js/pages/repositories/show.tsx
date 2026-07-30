@@ -24,7 +24,15 @@ type Release = {
     release_type: string;
     visibility: RepositoryVisibility;
     published_at: string | null;
-    updated_at: string;
+    updated_at: string | null;
+    change_summary: string | null;
+};
+type PaginatedReleases = {
+    data: Release[];
+    current_page: number;
+    last_page: number;
+    next_page_url: string | null;
+    prev_page_url: string | null;
 };
 
 export default function RepositoryShow({
@@ -35,7 +43,7 @@ export default function RepositoryShow({
 }: {
     repository: Repository;
     drafts: Release[];
-    publishedReleases: Release[];
+    publishedReleases: PaginatedReleases;
     actions: {
         canUpdate: boolean;
         canArchive: boolean;
@@ -155,14 +163,19 @@ export default function RepositoryShow({
                             Most recent first.
                         </p>
                     </div>
-                    {publishedReleases.length === 0 ? (
+                    {publishedReleases.data.length === 0 ? (
                         <Card>
                             <CardContent className="pt-6 text-sm text-muted-foreground">
                                 No published releases yet.
                             </CardContent>
                         </Card>
                     ) : (
-                        <ReleaseList releases={publishedReleases} />
+                        <>
+                            <ReleaseList releases={publishedReleases.data} />
+                            <TimelinePagination
+                                pagination={publishedReleases}
+                            />
+                        </>
                     )}
                 </section>
             </div>
@@ -186,7 +199,12 @@ function ReleaseList({
                 >
                     <div className="min-w-0">
                         <h3 className="truncate font-medium">
-                            {release.title}
+                            <Link
+                                href={ReleaseController.show(release.public_id)}
+                                className="rounded-sm hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                            >
+                                {release.title}
+                            </Link>
                         </h3>
                         <p className="text-sm text-muted-foreground">
                             {release.release_type} ·{' '}
@@ -194,6 +212,11 @@ function ReleaseList({
                                 ? `updated ${release.updated_at}`
                                 : release.published_at}
                         </p>
+                        {release.change_summary ? (
+                            <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
+                                {release.change_summary}
+                            </p>
+                        ) : null}
                     </div>
                     <div className="flex gap-2">
                         <Badge variant="secondary">v{release.version}</Badge>
@@ -215,5 +238,34 @@ function ReleaseList({
                 </article>
             ))}
         </div>
+    );
+}
+
+function TimelinePagination({ pagination }: { pagination: PaginatedReleases }) {
+    if (pagination.last_page <= 1) {
+        return null;
+    }
+
+    return (
+        <nav
+            className="flex flex-wrap items-center justify-between gap-3"
+            aria-label="Published release pages"
+        >
+            <p className="text-sm text-muted-foreground">
+                Page {pagination.current_page} of {pagination.last_page}
+            </p>
+            <div className="flex gap-2">
+                {pagination.prev_page_url ? (
+                    <Button variant="outline" size="sm" asChild>
+                        <Link href={pagination.prev_page_url}>Previous</Link>
+                    </Button>
+                ) : null}
+                {pagination.next_page_url ? (
+                    <Button variant="outline" size="sm" asChild>
+                        <Link href={pagination.next_page_url}>Next</Link>
+                    </Button>
+                ) : null}
+            </div>
+        </nav>
     );
 }

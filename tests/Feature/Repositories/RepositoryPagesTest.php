@@ -73,7 +73,7 @@ test('owner repository pages provide essential props and authorized action flags
             ->component('repositories/show')
             ->where('repository.public_id', $repository->public_id)
             ->has('drafts', 1)
-            ->has('publishedReleases', 1)
+            ->has('publishedReleases.data', 1)
             ->where('actions.canUpdate', true)
             ->where('actions.canArchive', true)
             ->where('actions.canRestore', false)
@@ -142,19 +142,19 @@ test('public and unlisted repositories resolve by their scoped direct routes wit
             ->component('repositories/public-show')
             ->where('profile.handle', 'octavia')
             ->where('repository.slug', $publicRepository->slug)
-            ->has('publishedReleases', 1)
+            ->has('publishedReleases.data', 1)
             ->missing('repository.public_id')
             ->missing('repository.release_count')
             ->missing('drafts')
             ->missing('actions')
-            ->missing('publishedReleases.0.visibility'),
+            ->missing('publishedReleases.data.0.visibility'),
         );
 
     $this->get(route('public.repositories.show', [$owner, $unlistedRepository]))
         ->assertInertia(fn (Assert $page) => $page
             ->component('repositories/public-show')
             ->where('repository.slug', $unlistedRepository->slug)
-            ->where('publishedReleases', []),
+            ->where('publishedReleases.data', []),
         );
 });
 

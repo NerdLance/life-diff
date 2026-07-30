@@ -14,6 +14,7 @@ import {
     repositoryVisibilityPresentation,
 } from '@/types';
 import type { ReleaseType, RepositoryVisibility } from '@/types';
+import type { ReleaseState } from '@/types';
 
 export type ComposerRepository = {
     public_id: string;
@@ -25,6 +26,7 @@ export type ComposerRepository = {
 
 export type ComposerRelease = {
     public_id?: string;
+    state?: ReleaseState;
     release_type: ReleaseType;
     version: string;
     title: string;
@@ -42,6 +44,7 @@ export function ReleaseComposer({
     submitUrl,
     method,
     cancelUrl,
+    publishUrl,
 }: {
     repository: ComposerRepository;
     release: ComposerRelease;
@@ -49,6 +52,7 @@ export function ReleaseComposer({
     submitUrl: string;
     method: 'post' | 'patch';
     cancelUrl: string;
+    publishUrl?: string;
 }) {
     const form = useForm<ComposerFormData>({
         release_type: release.release_type,
@@ -119,6 +123,12 @@ export function ReleaseComposer({
         }
 
         form.patch(submitUrl);
+    }
+
+    function publish(): void {
+        if (publishUrl) {
+            form.post(publishUrl);
+        }
     }
 
     function cancel(): void {
@@ -289,7 +299,9 @@ export function ReleaseComposer({
             />
 
             <p className="text-sm text-muted-foreground">
-                Draft changes are saved only when you choose Save draft.
+                {publishUrl
+                    ? 'Your draft changes are saved only when you choose Save draft or Publish now.'
+                    : 'Draft changes are saved only when you choose Save draft.'}
             </p>
 
             <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
@@ -302,8 +314,21 @@ export function ReleaseComposer({
                     Cancel
                 </Button>
                 <Button type="submit" disabled={form.processing}>
-                    {form.processing ? 'Saving…' : 'Save draft'}
+                    {form.processing
+                        ? 'Saving…'
+                        : release.state === 'published'
+                          ? 'Save changes'
+                          : 'Save draft'}
                 </Button>
+                {publishUrl ? (
+                    <Button
+                        type="button"
+                        onClick={publish}
+                        disabled={form.processing}
+                    >
+                        {form.processing ? 'Publishing…' : 'Publish now'}
+                    </Button>
+                ) : null}
             </div>
         </form>
     );

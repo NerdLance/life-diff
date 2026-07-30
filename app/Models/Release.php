@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\ReleaseState;
 use App\Enums\ReleaseType;
 use App\Enums\RepositoryVisibility;
+use Carbon\CarbonImmutable;
 use Database\Factories\ReleaseFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
@@ -13,7 +14,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Support\Carbon;
 use LogicException;
 
 /**
@@ -26,9 +26,9 @@ use LogicException;
  * @property string $title
  * @property string|null $body
  * @property RepositoryVisibility $visibility
- * @property Carbon|null $published_at
- * @property Carbon|null $edited_at
- * @property Carbon|null $deleted_at
+ * @property CarbonImmutable|null $published_at
+ * @property CarbonImmutable|null $edited_at
+ * @property CarbonImmutable|null $deleted_at
  */
 class Release extends Model
 {

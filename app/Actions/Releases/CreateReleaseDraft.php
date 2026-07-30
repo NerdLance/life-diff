@@ -10,6 +10,8 @@ use Illuminate\Support\Facades\DB;
 
 class CreateReleaseDraft
 {
+    public function __construct(private SynchronizeChangeEntries $synchronizeChangeEntries) {}
+
     /**
      * @param  array{body: string|null, change_entries: list<array{change_type: string, content: string}>, release_type: string, title: string, version: string, visibility: string}  $attributes
      */
@@ -22,22 +24,9 @@ class CreateReleaseDraft
                 'published_at' => null,
             ]);
 
-            $this->synchronizeChangeEntries($release, $attributes['change_entries']);
+            ($this->synchronizeChangeEntries)($release, $attributes['change_entries']);
 
             return $release;
         });
-    }
-
-    /**
-     * @param  list<array{change_type: string, content: string}>  $changeEntries
-     */
-    private function synchronizeChangeEntries(Release $release, array $changeEntries): void
-    {
-        foreach ($changeEntries as $sortOrder => $changeEntry) {
-            $release->changeEntries()->create([
-                ...$changeEntry,
-                'sort_order' => $sortOrder,
-            ]);
-        }
     }
 }

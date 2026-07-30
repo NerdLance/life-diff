@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\PublicProfileController;
+use App\Http\Controllers\PublicReleaseController;
 use App\Http\Controllers\PublicRepositoryController;
 use App\Http\Controllers\ReleaseController;
 use App\Http\Controllers\RepositoryController;
@@ -25,9 +26,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('repositories/{repository:public_id}/releases', [ReleaseController::class, 'store'])->name('repositories.releases.store');
     Route::get('releases/{release:public_id}/edit', [ReleaseController::class, 'edit'])->name('releases.edit');
     Route::patch('releases/{release:public_id}', [ReleaseController::class, 'update'])->name('releases.update');
+    Route::post('releases/{release:public_id}/publish', [ReleaseController::class, 'publish'])->name('releases.publish');
     Route::delete('releases/{release:public_id}', [ReleaseController::class, 'destroy'])->name('releases.destroy');
+    Route::get('releases/{release:public_id}', [ReleaseController::class, 'show'])->name('releases.show');
 });
 
+Route::get('r/{release:public_id}', [PublicReleaseController::class, 'show'])->name('public.releases.show');
 Route::get('/@{user:handle}', [PublicProfileController::class, 'show'])->name('profiles.show');
 Route::get('/@{user:handle}/{repository:slug}', [PublicRepositoryController::class, 'show'])
     ->scopeBindings()

@@ -5,16 +5,14 @@ namespace App\Http\Requests\Releases;
 use App\Models\Release;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Validation\ValidationRule;
-use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
-class DeleteReleaseRequest extends FormRequest
+class PublishReleaseRequest extends UpdateReleaseRequest
 {
     public function authorize(): bool
     {
         $release = $this->route('release');
 
-        return $release instanceof Release && $this->user()?->can('delete', $release) === true;
+        return $release instanceof Release && $this->user()?->can('publish', $release) === true;
     }
 
     protected function failedAuthorization(): void
@@ -33,10 +31,9 @@ class DeleteReleaseRequest extends FormRequest
      */
     public function rules(): array
     {
-        $release = $this->route('release');
-
-        return $release instanceof Release
-            ? ['confirmation' => ['required', 'string', Rule::in([$release->title])]]
-            : [];
+        return [
+            ...parent::rules(),
+            'change_entries' => ['present', 'array', 'min:1', 'max:50'],
+        ];
     }
 }

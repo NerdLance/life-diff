@@ -4,9 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Actions\Releases\CreateReleaseDraft;
 use App\Actions\Releases\DeleteRelease;
+use App\Actions\Releases\PublishRelease;
 use App\Actions\Releases\SuggestReleaseVersion;
 use App\Actions\Releases\UpdateRelease;
+use App\Enums\RepositoryVisibility;
 use App\Http\Requests\Releases\DeleteReleaseRequest;
+use App\Http\Requests\Releases\PublishReleaseRequest;
 use App\Http\Requests\Releases\ReleaseVersionSuggestionRequest;
 use App\Http\Requests\Releases\StoreReleaseDraftRequest;
 use App\Http\Requests\Releases\UpdateReleaseRequest;
@@ -53,6 +56,7 @@ class ReleaseController extends Controller
             'suggestedVersion' => $suggestReleaseVersion($release->repository, $request->releaseType()),
             'release' => [
                 'public_id' => $release->public_id,
+                'state' => $release->state->value,
                 'version' => $release->version,
                 'release_type' => $release->release_type->value,
                 'title' => $release->title,
@@ -70,9 +74,58 @@ class ReleaseController extends Controller
 
     public function update(UpdateReleaseRequest $request, Release $release, UpdateRelease $updateRelease): RedirectResponse
     {
-        $updateRelease($release, $request->releaseAttributes());
+        $release = $updateRelease($release, $request->releaseAttributes());
 
-        return to_route('repositories.show', $release->repository);
+        return to_route('releases.show', $release);
+    }
+
+    public function publish(PublishReleaseRequest $request, Release $release, PublishRelease $publishRelease): RedirectResponse
+    {
+        $release = $publishRelease($release, $request->releaseAttributes());
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => __('Release published.')]);
+
+        return to_route('releases.show', $release);
+    }
+
+    public function show(Release $release): Response
+    {
+        Gate::authorize('view', $release);
+
+        $repository = $release->repository;
+        $owner = $repository->owner;
+        $isOwner = $owner->is(request()->user());
+
+        return Inertia::render('releases/show', [
+            'profile' => [
+                'display_name' => $owner->display_name ?? $owner->name,
+                'handle' => $owner->handle,
+            ],
+            'repository' => $this->repositoryDetail($repository),
+            'release' => [
+                'public_id' => $release->public_id,
+                'version' => $release->version,
+                'release_type' => $release->release_type->value,
+                'state' => $release->state->value,
+                'title' => $release->title,
+                'body' => $release->body,
+                'visibility' => $release->visibility->value,
+                'published_at' => $release->published_at?->toIso8601String(),
+                'edited_at' => $release->edited_at?->toIso8601String(),
+                'change_entries' => $release->changeEntries()->get()->map(fn ($changeEntry): array => [
+                    'change_type' => $changeEntry->change_type->value,
+                    'content' => $changeEntry->content,
+                ])->values(),
+            ],
+            'actions' => [
+                'canUpdate' => Gate::allows('update', $release),
+                'canDelete' => Gate::allows('delete', $release),
+                'isOwner' => $isOwner,
+            ],
+            'copyLink' => $release->isPublished() && $release->visibility !== RepositoryVisibility::Private && $repository->visibility !== RepositoryVisibility::Private
+                ? route('public.releases.show', $release)
+                : null,
+        ]);
     }
 
     public function destroy(DeleteReleaseRequest $request, Release $release, DeleteRelease $deleteRelease): RedirectResponse

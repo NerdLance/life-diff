@@ -18,6 +18,7 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -65,8 +66,8 @@ class RepositoryController extends Controller
 
         return Inertia::render('repositories/show', [
             'repository' => $this->repositoryDetail($repository),
-            'drafts' => $repository->releases()->drafts()->latest('updated_at')->get()->map($this->releaseItem(...))->values(),
-            'publishedReleases' => $repository->releases()->published()->chronological()->limit(20)->get()->map($this->releaseItem(...))->values(),
+            'drafts' => $repository->releases()->drafts()->with('changeEntries')->latest('updated_at')->get()->map($this->releaseItem(...))->values(),
+            'publishedReleases' => $repository->releases()->published()->with('changeEntries')->chronological()->paginate(20)->through($this->releaseItem(...)),
             'actions' => [
                 'canUpdate' => Gate::allows('update', $repository),
                 'canArchive' => Gate::allows('archive', $repository),
@@ -167,7 +168,7 @@ class RepositoryController extends Controller
         ];
     }
 
-    /** @return array{public_id: string, version: string, title: string, release_type: string, visibility: string, published_at: string|null, updated_at: string} */
+    /** @return array{public_id: string, version: string, title: string, release_type: string, visibility: string, published_at: string|null, updated_at: string|null, change_summary: string|null} */
     private function releaseItem(Release $release): array
     {
         return [
@@ -178,6 +179,9 @@ class RepositoryController extends Controller
             'visibility' => $release->visibility->value,
             'published_at' => $release->published_at?->toDateString(),
             'updated_at' => $release->updated_at?->toDateString(),
+            'change_summary' => $release->changeEntries->first() === null
+                ? null
+                : Str::limit($release->changeEntries->first()->content, 140),
         ];
     }
 }

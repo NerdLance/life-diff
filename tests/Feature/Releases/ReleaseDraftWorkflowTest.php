@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Releases\PublishRelease;
 use App\Actions\Releases\SuggestReleaseVersion;
 use App\Enums\ChangeType;
 use App\Enums\ReleaseState;
@@ -9,6 +10,7 @@ use App\Models\ChangeEntry;
 use App\Models\Release;
 use App\Models\Repository;
 use App\Models\User;
+use Illuminate\Validation\ValidationException;
 use Inertia\Testing\AssertableInertia as Assert;
 
 function releaseDraftPayload(array $overrides = []): array
@@ -166,7 +168,7 @@ test('owners can reorder and synchronize draft entries while preserving accepted
                 ['id' => $first->id, 'client_id' => 'first', 'change_type' => ChangeType::Added->value, 'content' => 'First, updated'],
             ],
         ]))
-        ->assertRedirect(route('repositories.show', $repository));
+        ->assertRedirect(route('releases.show', $release));
 
     expect($release->changeEntries()->pluck('id')->all())->toBe([$second->id, $first->id])
         ->and($release->changeEntries()->pluck('sort_order')->all())->toBe([0, 1]);
@@ -271,4 +273,182 @@ test('deleting a draft requires its typed title and soft deletes the release', f
 
     expect(Release::find($release->id))->toBeNull()
         ->and(Release::withTrashed()->find($release->id)?->trashed())->toBeTrue();
+});
+
+test('an owner can publish a complete draft atomically', function (): void {
+    $owner = User::factory()->create();
+    $repository = Repository::factory()->public()->for($owner, 'owner')->create();
+    $release = Release::factory()->draft()->for($repository)->create();
+
+    $this->actingAs($owner)
+        ->post(route('releases.publish', $release), releaseDraftPayload([
+            'version' => $release->version,
+            'visibility' => RepositoryVisibility::Public->value,
+            'change_entries' => [
+                ['client_id' => 'first', 'change_type' => ChangeType::Added->value, 'content' => 'Started documenting this change.'],
+            ],
+        ]))
+        ->assertRedirect(route('releases.show', $release));
+
+    $release->refresh();
+
+    expect($release->state)->toBe(ReleaseState::Published)
+        ->and($release->published_at)->not->toBeNull()
+        ->and($release->edited_at)->toBeNull()
+        ->and($release->changeEntries->pluck('sort_order')->all())->toBe([0]);
+});
+
+test('publishing rejects incomplete, archived, over-ceiling, and duplicate releases', function (): void {
+    $owner = User::factory()->create();
+    $repository = Repository::factory()->for($owner, 'owner')->create();
+    $release = Release::factory()->draft()->for($repository)->create();
+
+    $this->actingAs($owner)
+        ->from(route('releases.edit', $release))
+        ->post(route('releases.publish', $release), releaseDraftPayload(['version' => $release->version]))
+        ->assertSessionHasErrors('change_entries');
+
+    $this->actingAs($owner)
+        ->from(route('releases.edit', $release))
+        ->post(route('releases.publish', $release), releaseDraftPayload([
+            'version' => $release->version,
+            'visibility' => RepositoryVisibility::Public->value,
+            'change_entries' => [['change_type' => ChangeType::Added->value, 'content' => 'Valid entry']],
+        ]))
+        ->assertSessionHasErrors('visibility');
+
+    $collision = Release::factory()->draft()->for($repository)->create(['version' => '9.9.9']);
+
+    $this->actingAs($owner)
+        ->from(route('releases.edit', $release))
+        ->post(route('releases.publish', $release), releaseDraftPayload([
+            'version' => $collision->version,
+            'change_entries' => [['change_type' => ChangeType::Added->value, 'content' => 'Valid entry']],
+        ]))
+        ->assertSessionHasErrors('version');
+
+    $repository->archived_at = now();
+    $repository->save();
+
+    $this->actingAs($owner)
+        ->post(route('releases.publish', $release), releaseDraftPayload([
+            'version' => $release->version,
+            'change_entries' => [['change_type' => ChangeType::Added->value, 'content' => 'Valid entry']],
+        ]))
+        ->assertForbidden();
+});
+
+test('a failed publication rolls all writes back', function (): void {
+    $repository = Repository::factory()->create();
+    $release = Release::factory()->draft()->for($repository)->create([
+        'title' => 'Original draft',
+        'version' => '0.1.0',
+    ]);
+    ChangeEntry::factory()->for($release)->create(['sort_order' => 0, 'content' => 'Original entry']);
+    Release::factory()->draft()->for($repository)->create(['version' => '1.0.0']);
+
+    expect(fn () => app(PublishRelease::class)($release, releaseDraftPayload([
+        'title' => 'Changed title',
+        'version' => '1.0.0',
+        'change_entries' => [['change_type' => ChangeType::Added->value, 'content' => 'Changed entry']],
+    ])))->toThrow(ValidationException::class);
+
+    $release->refresh();
+
+    expect($release->title)->toBe('Original draft')
+        ->and($release->state)->toBe(ReleaseState::Draft)
+        ->and($release->published_at)->toBeNull()
+        ->and($release->changeEntries()->value('content'))->toBe('Original entry');
+});
+
+test('published releases retain their publication date, receive an edit date, and synchronize entries', function (): void {
+    $owner = User::factory()->create();
+    $repository = Repository::factory()->public()->for($owner, 'owner')->create();
+    $publishedAt = now()->subDay();
+    $release = Release::factory()->published()->for($repository)->create([
+        'published_at' => $publishedAt,
+        'visibility' => RepositoryVisibility::Public,
+    ]);
+    $first = ChangeEntry::factory()->for($release)->create(['sort_order' => 0, 'content' => 'First']);
+    $second = ChangeEntry::factory()->for($release)->create(['sort_order' => 1, 'content' => 'Second']);
+
+    $this->actingAs($owner)
+        ->patch(route('releases.update', $release), releaseDraftPayload([
+            'title' => 'Updated publication',
+            'version' => $release->version,
+            'visibility' => RepositoryVisibility::Public->value,
+            'change_entries' => [
+                ['id' => $second->id, 'change_type' => ChangeType::Fixed->value, 'content' => 'Second first'],
+                ['id' => $first->id, 'change_type' => ChangeType::Added->value, 'content' => 'First second'],
+            ],
+        ]))
+        ->assertRedirect(route('releases.show', $release));
+
+    $release->refresh();
+
+    expect($release->published_at?->toDateTimeString())->toBe($publishedAt->toDateTimeString())
+        ->and($release->edited_at)->not->toBeNull()
+        ->and($release->changeEntries()->pluck('id')->all())->toBe([$second->id, $first->id])
+        ->and($release->changeEntries()->pluck('sort_order')->all())->toBe([0, 1]);
+});
+
+test('published releases require an entry, can be deleted with confirmation, and cannot be published twice', function (): void {
+    $owner = User::factory()->create();
+    $repository = Repository::factory()->for($owner, 'owner')->create();
+    $release = Release::factory()->draft()->for($repository)->create(['title' => 'Publish once']);
+
+    $this->actingAs($owner)
+        ->post(route('releases.publish', $release), releaseDraftPayload([
+            'version' => $release->version,
+            'change_entries' => [['change_type' => ChangeType::Added->value, 'content' => 'A valid entry']],
+        ]))
+        ->assertRedirect();
+
+    expect($release->refresh()->isPublished())->toBeTrue();
+
+    $this->actingAs($owner)
+        ->patch(route('releases.update', $release), releaseDraftPayload([
+            'version' => $release->version,
+            'change_entries' => [],
+        ]))
+        ->assertSessionHasErrors('change_entries');
+
+    $this->actingAs($owner)
+        ->post(route('releases.publish', $release), releaseDraftPayload([
+            'version' => $release->version,
+            'change_entries' => [['change_type' => ChangeType::Added->value, 'content' => 'A valid entry']],
+        ]))
+        ->assertForbidden();
+
+    $this->actingAs($owner)
+        ->delete(route('releases.destroy', $release), ['confirmation' => $release->title])
+        ->assertRedirect(route('repositories.show', $repository));
+
+    $this->actingAs($owner)
+        ->get(route('releases.show', $release->public_id))
+        ->assertNotFound();
+});
+
+test('private publications remain inaccessible to guests and non-owners', function (): void {
+    $owner = User::factory()->create();
+    $otherUser = User::factory()->create();
+    $repository = Repository::factory()->for($owner, 'owner')->create();
+    $release = Release::factory()->published()->for($repository)->create([
+        'visibility' => RepositoryVisibility::Private,
+    ]);
+    ChangeEntry::factory()->for($release)->create();
+
+    $this->get(route('releases.show', $release))
+        ->assertRedirect(route('login'));
+
+    $this->actingAs($otherUser)
+        ->get(route('releases.show', $release))
+        ->assertNotFound();
+
+    $this->actingAs($otherUser)
+        ->post(route('releases.publish', $release), releaseDraftPayload([
+            'version' => $release->version,
+            'change_entries' => [['change_type' => ChangeType::Added->value, 'content' => 'No access']],
+        ]))
+        ->assertNotFound();
 });

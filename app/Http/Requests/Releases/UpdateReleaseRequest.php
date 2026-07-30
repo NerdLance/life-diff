@@ -38,9 +38,7 @@ class UpdateReleaseRequest extends FormRequest
     {
         $release = $this->route('release');
 
-        if ($release instanceof Release
-            && $release->isDraft()
-            && ! $release->repository->owner->is($this->user())) {
+        if ($release instanceof Release && ! $release->repository->owner->is($this->user())) {
             throw (new AuthorizationException)->asNotFound();
         }
 
@@ -94,6 +92,11 @@ class UpdateReleaseRequest extends FormRequest
     public function rules(): array
     {
         $release = $this->route('release');
+        $changeEntryRules = ['present', 'array', 'max:50'];
+
+        if ($release instanceof Release && $release->isPublished()) {
+            $changeEntryRules[] = 'min:1';
+        }
 
         return [
             'title' => ['required', 'string', 'min:1', 'max:160'],
@@ -112,7 +115,7 @@ class UpdateReleaseRequest extends FormRequest
             'release_type' => ['required', Rule::enum(ReleaseType::class)],
             'body' => ['nullable', 'string', 'max:10000'],
             'visibility' => ['required', Rule::enum(RepositoryVisibility::class)],
-            'change_entries' => ['present', 'array', 'max:50'],
+            'change_entries' => $changeEntryRules,
             'change_entries.*.id' => ['nullable', 'integer', 'distinct', Rule::exists(ChangeEntry::class, 'id')],
             'change_entries.*.client_id' => ['nullable', 'string', 'max:64'],
             'change_entries.*.change_type' => ['required', Rule::enum(ChangeType::class)],
@@ -133,6 +136,10 @@ class UpdateReleaseRequest extends FormRequest
 
             if (! VisibilityCeiling::allows($release->repository->visibility, $visibility)) {
                 $validator->errors()->add('visibility', 'The release visibility cannot exceed the repository visibility.');
+            }
+
+            if ($release->isPublished() && $this->input('change_entries', []) === []) {
+                $validator->errors()->add('change_entries', 'A published release needs at least one change entry.');
             }
 
             foreach ((array) $this->input('change_entries', []) as $key => $entry) {

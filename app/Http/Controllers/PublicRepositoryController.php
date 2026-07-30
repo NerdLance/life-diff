@@ -28,14 +28,15 @@ class PublicRepositoryController extends Controller
                 'status' => $repository->status->value,
                 'visibility' => $repository->visibility->value,
             ],
-            'publishedReleases' => $repository->releases()->published()->where('visibility', RepositoryVisibility::Public)->chronological()->limit(20)->get()->map($this->releaseItem(...))->values(),
+            'publishedReleases' => $repository->releases()->published()->where('visibility', RepositoryVisibility::Public)->chronological()->paginate(20)->through($this->releaseItem(...)),
         ]);
     }
 
-    /** @return array{version: string, title: string, release_type: string, published_at: string|null} */
+    /** @return array{public_id: string, version: string, title: string, release_type: string, published_at: string|null} */
     private function releaseItem(Release $release): array
     {
         return [
+            'public_id' => $release->public_id,
             'version' => $release->version,
             'title' => $release->title,
             'release_type' => $release->release_type->value,
