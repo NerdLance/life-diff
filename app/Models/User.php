@@ -62,4 +62,11 @@ class User extends Authenticatable implements PasskeyUser
     {
         return $this->hasMany(Repository::class, 'owner_id');
     }
+
+    protected function childRouteBindingRelationshipName($childType): string
+    {
+        return $childType === 'repository'
+            ? 'ownedRepositories'
+            : parent::childRouteBindingRelationshipName($childType);
+    }
 }

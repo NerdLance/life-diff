@@ -133,6 +133,20 @@ class Release extends Model
     }
 
     /**
+     * @param  Builder<Release>  $query
+     * @return Builder<Release>
+     */
+    public function scopePubliclyListed(Builder $query): Builder
+    {
+        return $query
+            ->published()
+            ->where('visibility', RepositoryVisibility::Public)
+            ->whereHas('repository', fn (Builder $query) => $query
+                ->where('visibility', RepositoryVisibility::Public)
+                ->whereNull('archived_at'));
+    }
+
+    /**
      * This narrows collection queries only. Policies still authorize individual resources.
      *
      * @param  Builder<Release>  $query
@@ -162,17 +176,18 @@ class Release extends Model
                 return;
             }
 
-            $query->published()
-                ->whereIn('visibility', [
-                    RepositoryVisibility::Unlisted,
-                    RepositoryVisibility::Public,
-                ])
-                ->whereHas('repository', function (Builder $query): void {
-                    $query->whereIn('visibility', [
-                        RepositoryVisibility::Unlisted,
-                        RepositoryVisibility::Public,
-                    ]);
+            $query->published()->where(function (Builder $query): void {
+                $query->where(function (Builder $query): void {
+                    $query->where('visibility', RepositoryVisibility::Unlisted)
+                        ->whereHas('repository', fn (Builder $query) => $query->whereIn('visibility', [
+                            RepositoryVisibility::Unlisted,
+                            RepositoryVisibility::Public,
+                        ]));
+                })->orWhere(function (Builder $query): void {
+                    $query->where('visibility', RepositoryVisibility::Public)
+                        ->whereHas('repository', fn (Builder $query) => $query->where('visibility', RepositoryVisibility::Public));
                 });
+            });
         });
     }
 

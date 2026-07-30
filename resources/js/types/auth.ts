@@ -1,8 +1,15 @@
+import type { ProfileStatus } from './lifediff';
+
 export type User = {
     id: number;
     name: string;
     email: string;
     avatar?: string;
+    handle: string | null;
+    display_name: string | null;
+    bio: string | null;
+    status: ProfileStatus;
+    timezone: string;
     email_verified_at: string | null;
     two_factor_enabled?: boolean;
     created_at: string;

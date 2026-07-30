@@ -121,9 +121,9 @@ scope is explicitly amended:
 1. Canonical contract location: retain the current private storage path, or add
    the requested `docs/contracts/lifediff-phase-1.md` as the single source of
    truth without creating divergent copies.
-2. `name` and `display_name`: decide whether registration stores the same value
-   in both fields and whether later profile edits keep them synchronized while
-   retaining `name` for authentication compatibility.
+2. `name` and `display_name`: resolved. Registration and profile updates store
+   the display name in both fields, retaining `name` for authentication
+   compatibility while making `display_name` the LifeDiff identity input.
 3. Repository name normalization: resolved by the `normalized_name` column and
    owner-scoped unique index. Later writes must populate the lowercased,
    normalized value.
