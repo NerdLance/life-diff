@@ -89,6 +89,33 @@ export const releaseTypes = [
 
 export type ReleaseType = (typeof releaseTypes)[number];
 
+export const releaseTypePresentation = {
+    major: {
+        label: 'Major',
+        description: 'A substantial shift or new chapter.',
+    },
+    minor: {
+        label: 'Minor',
+        description: 'A meaningful, contained development.',
+    },
+    patch: {
+        label: 'Patch',
+        description: 'A small adjustment or continuation.',
+    },
+    hotfix: {
+        label: 'Hotfix',
+        description: 'A focused response to something that needs attention.',
+    },
+    experimental: {
+        label: 'Experimental',
+        description: 'A trial worth documenting, whatever the outcome.',
+    },
+    rollback: {
+        label: 'Rollback',
+        description: 'A deliberate return to a prior approach.',
+    },
+} satisfies Record<ReleaseType, PresentationMetadata>;
+
 export const changeTypes = [
     'added',
     'improved',
@@ -99,3 +126,30 @@ export const changeTypes = [
 ] as const;
 
 export type ChangeType = (typeof changeTypes)[number];
+
+export const changeTypePresentation = {
+    added: {
+        label: 'Added',
+        description: 'Something new entered the picture.',
+    },
+    improved: {
+        label: 'Improved',
+        description: 'Something changed in a helpful way.',
+    },
+    fixed: {
+        label: 'Fixed',
+        description: 'A problem received attention or resolution.',
+    },
+    removed: {
+        label: 'Removed',
+        description: 'Something was intentionally taken away.',
+    },
+    deprecated: {
+        label: 'Deprecated',
+        description: 'Something is being phased out or reconsidered.',
+    },
+    known_issue: {
+        label: 'Known issue',
+        description: 'An unresolved issue is being recorded clearly.',
+    },
+} satisfies Record<ChangeType, PresentationMetadata>;

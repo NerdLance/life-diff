@@ -12,16 +12,27 @@ use App\Http\Requests\Releases\StoreReleaseDraftRequest;
 use App\Http\Requests\Releases\UpdateReleaseRequest;
 use App\Models\Release;
 use App\Models\Repository;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Str;
+use Inertia\Inertia;
+use Inertia\Response;
 
 class ReleaseController extends Controller
 {
-    public function create(ReleaseVersionSuggestionRequest $request, Repository $repository, SuggestReleaseVersion $suggestReleaseVersion): JsonResponse
+    public function create(ReleaseVersionSuggestionRequest $request, Repository $repository, SuggestReleaseVersion $suggestReleaseVersion): Response
     {
-        return response()->json([
-            'suggested_version' => $suggestReleaseVersion($repository, $request->releaseType()),
+        return Inertia::render('releases/create', [
+            'repository' => $this->repositoryDetail($repository),
+            'suggestedVersion' => $suggestReleaseVersion($repository, $request->releaseType()),
+            'release' => [
+                'release_type' => $request->releaseType()->value,
+                'version' => $suggestReleaseVersion($repository, $request->releaseType()),
+                'title' => '',
+                'body' => '',
+                'visibility' => 'private',
+                'change_entries' => [$this->emptyChangeEntry()],
+            ],
         ]);
     }
 
@@ -32,12 +43,14 @@ class ReleaseController extends Controller
         return to_route('repositories.show', $repository);
     }
 
-    public function edit(Release $release): JsonResponse
+    public function edit(ReleaseVersionSuggestionRequest $request, Release $release, SuggestReleaseVersion $suggestReleaseVersion): Response
     {
         Gate::authorize('view', $release);
         Gate::authorize('update', $release);
 
-        return response()->json([
+        return Inertia::render('releases/edit', [
+            'repository' => $this->repositoryDetail($release->repository),
+            'suggestedVersion' => $suggestReleaseVersion($release->repository, $request->releaseType()),
             'release' => [
                 'public_id' => $release->public_id,
                 'version' => $release->version,
@@ -47,6 +60,7 @@ class ReleaseController extends Controller
                 'visibility' => $release->visibility->value,
                 'change_entries' => $release->changeEntries()->get()->map(fn ($changeEntry): array => [
                     'id' => $changeEntry->id,
+                    'client_id' => 'entry-'.$changeEntry->id,
                     'change_type' => $changeEntry->change_type->value,
                     'content' => $changeEntry->content,
                 ])->values(),
@@ -67,5 +81,27 @@ class ReleaseController extends Controller
         $deleteRelease($release);
 
         return to_route('repositories.show', $repository);
+    }
+
+    /** @return array{public_id: string, name: string, slug: string, status: string, visibility: string} */
+    private function repositoryDetail(Repository $repository): array
+    {
+        return [
+            'public_id' => $repository->public_id,
+            'name' => $repository->name,
+            'slug' => $repository->slug,
+            'status' => $repository->status->value,
+            'visibility' => $repository->visibility->value,
+        ];
+    }
+
+    /** @return array{client_id: string, change_type: string, content: string} */
+    private function emptyChangeEntry(): array
+    {
+        return [
+            'client_id' => (string) Str::uuid(),
+            'change_type' => 'added',
+            'content' => '',
+        ];
     }
 }

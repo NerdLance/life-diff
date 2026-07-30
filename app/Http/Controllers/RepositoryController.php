@@ -72,6 +72,7 @@ class RepositoryController extends Controller
                 'canArchive' => Gate::allows('archive', $repository),
                 'canRestore' => Gate::allows('restore', $repository),
                 'canDelete' => Gate::allows('delete', $repository),
+                'canCreateRelease' => Gate::allows('create', [Release::class, $repository]),
             ],
         ]);
     }

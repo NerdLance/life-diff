@@ -9,6 +9,7 @@ use App\Models\ChangeEntry;
 use App\Models\Release;
 use App\Models\Repository;
 use App\Models\User;
+use Inertia\Testing\AssertableInertia as Assert;
 
 function releaseDraftPayload(array $overrides = []): array
 {
@@ -48,7 +49,10 @@ test('first release and every release type receive the contract version suggesti
             'release_type' => ReleaseType::Major->value,
         ]))
         ->assertSuccessful()
-        ->assertJsonPath('suggested_version', '3.0.0');
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('releases/create')
+            ->where('suggestedVersion', '3.0.0'),
+        );
 });
 
 test('the draft create route supplies a server generated version suggestion', function (): void {
@@ -58,7 +62,32 @@ test('the draft create route supplies a server generated version suggestion', fu
     $this->actingAs($owner)
         ->get(route('repositories.releases.create', $repository))
         ->assertSuccessful()
-        ->assertJsonPath('suggested_version', '0.1.0');
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('releases/create')
+            ->where('repository.public_id', $repository->public_id)
+            ->where('suggestedVersion', '0.1.0')
+            ->where('release.visibility', RepositoryVisibility::Private->value)
+            ->has('release.change_entries', 1),
+        );
+});
+
+test('owners receive an editable composer with persisted entry identity and a suggestion', function (): void {
+    $owner = User::factory()->create();
+    $repository = Repository::factory()->for($owner, 'owner')->create();
+    $release = Release::factory()->draft()->for($repository)->create();
+    $entry = ChangeEntry::factory()->for($release)->create(['sort_order' => 0]);
+
+    $this->actingAs($owner)
+        ->get(route('releases.edit', $release))
+        ->assertSuccessful()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('releases/edit')
+            ->where('repository.public_id', $repository->public_id)
+            ->where('release.public_id', $release->public_id)
+            ->where('release.change_entries.0.id', $entry->id)
+            ->where('release.change_entries.0.client_id', 'entry-'.$entry->id)
+            ->where('suggestedVersion', '0.1.0'),
+        );
 });
 
 test('owners can create a draft with a manual normalized version and no entries', function (): void {
@@ -79,6 +108,25 @@ test('owners can create a draft with a manual normalized version and no entries'
         ->and($release->published_at)->toBeNull()
         ->and($release->visibility)->toBe(RepositoryVisibility::Public)
         ->and($release->changeEntries)->toHaveCount(0);
+});
+
+test('draft validation returns to the relevant composer route', function (): void {
+    $owner = User::factory()->create();
+    $repository = Repository::factory()->for($owner, 'owner')->create();
+    $release = Release::factory()->draft()->for($repository)->create();
+
+    $this->actingAs($owner)
+        ->post(route('repositories.releases.store', $repository), releaseDraftPayload(['title' => '']))
+        ->assertRedirect(route('repositories.releases.create', $repository))
+        ->assertSessionHasErrors('title');
+
+    $this->actingAs($owner)
+        ->patch(route('releases.update', $release), releaseDraftPayload([
+            'title' => '',
+            'version' => $release->version,
+        ]))
+        ->assertRedirect(route('releases.edit', $release))
+        ->assertSessionHasErrors('title');
 });
 
 test('drafts synchronize multiple change entries in submitted order and remove empty rows', function (): void {
@@ -157,8 +205,20 @@ test('draft routes reject other users and guests', function (): void {
         ->assertNotFound();
 
     $this->actingAs($otherUser)
+        ->get(route('repositories.releases.create', $repository))
+        ->assertNotFound();
+
+    $this->actingAs($otherUser)
         ->post(route('repositories.releases.store', $repository), releaseDraftPayload())
-        ->assertForbidden();
+        ->assertNotFound();
+
+    $this->actingAs($otherUser)
+        ->patch(route('releases.update', $release), releaseDraftPayload(['version' => $release->version]))
+        ->assertNotFound();
+
+    $this->actingAs($otherUser)
+        ->delete(route('releases.destroy', $release), ['confirmation' => $release->title])
+        ->assertNotFound();
 
 });
 
@@ -173,6 +233,10 @@ test('archived repositories reject draft creation and updates', function (): voi
 
     $this->actingAs($owner)
         ->patch(route('releases.update', $release), releaseDraftPayload(['version' => $release->version]))
+        ->assertForbidden();
+
+    $this->actingAs($owner)
+        ->delete(route('releases.destroy', $release), ['confirmation' => $release->title])
         ->assertForbidden();
 });
 

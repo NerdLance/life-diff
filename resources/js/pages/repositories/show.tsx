@@ -1,5 +1,6 @@
 import { Form, Head, Link } from '@inertiajs/react';
-import { ArchiveRestore, Settings2 } from 'lucide-react';
+import { ArchiveRestore, Plus, Settings2 } from 'lucide-react';
+import ReleaseController from '@/actions/App/Http/Controllers/ReleaseController';
 import RepositoryController from '@/actions/App/Http/Controllers/RepositoryController';
 import { RepositoryBadges } from '@/components/repositories/repository-badges';
 import { Badge } from '@/components/ui/badge';
@@ -40,6 +41,7 @@ export default function RepositoryShow({
         canArchive: boolean;
         canRestore: boolean;
         canDelete: boolean;
+        canCreateRelease: boolean;
     };
 }) {
     return (
@@ -65,6 +67,17 @@ export default function RepositoryShow({
                         />
                     </div>
                     <div className="flex flex-wrap gap-2">
+                        {actions.canCreateRelease && (
+                            <Button asChild>
+                                <Link
+                                    href={ReleaseController.create(
+                                        repository.public_id,
+                                    )}
+                                >
+                                    <Plus /> New draft
+                                </Link>
+                            </Button>
+                        )}
                         {actions.canUpdate && (
                             <Button variant="outline" asChild>
                                 <Link
@@ -187,6 +200,17 @@ function ReleaseList({
                         <Badge variant="outline">
                             {draft ? 'Draft' : release.visibility}
                         </Badge>
+                        {draft && (
+                            <Button variant="outline" size="sm" asChild>
+                                <Link
+                                    href={ReleaseController.edit(
+                                        release.public_id,
+                                    )}
+                                >
+                                    Continue
+                                </Link>
+                            </Button>
+                        )}
                     </div>
                 </article>
             ))}

@@ -9,6 +9,7 @@ use App\Enums\ReleaseType;
 use App\Enums\RepositoryVisibility;
 use App\Models\Release;
 use App\Models\Repository;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -17,11 +18,33 @@ use InvalidArgumentException;
 
 class StoreReleaseDraftRequest extends FormRequest
 {
+    public function getRedirectUrl(): string
+    {
+        $repository = $this->route('repository');
+
+        return $repository instanceof Repository
+            ? route('repositories.releases.create', $repository)
+            : parent::getRedirectUrl();
+    }
+
     public function authorize(): bool
     {
         $repository = $this->route('repository');
 
         return $repository instanceof Repository && $this->user()?->can('create', [Release::class, $repository]) === true;
+    }
+
+    protected function failedAuthorization(): void
+    {
+        $repository = $this->route('repository');
+
+        if ($repository instanceof Repository
+            && $repository->visibility === RepositoryVisibility::Private
+            && ! $repository->owner->is($this->user())) {
+            throw (new AuthorizationException)->asNotFound();
+        }
+
+        parent::failedAuthorization();
     }
 
     protected function prepareForValidation(): void

@@ -9,6 +9,7 @@ use App\Enums\ReleaseType;
 use App\Enums\RepositoryVisibility;
 use App\Models\ChangeEntry;
 use App\Models\Release;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -17,11 +18,33 @@ use InvalidArgumentException;
 
 class UpdateReleaseRequest extends FormRequest
 {
+    public function getRedirectUrl(): string
+    {
+        $release = $this->route('release');
+
+        return $release instanceof Release
+            ? route('releases.edit', $release)
+            : parent::getRedirectUrl();
+    }
+
     public function authorize(): bool
     {
         $release = $this->route('release');
 
         return $release instanceof Release && $this->user()?->can('update', $release) === true;
+    }
+
+    protected function failedAuthorization(): void
+    {
+        $release = $this->route('release');
+
+        if ($release instanceof Release
+            && $release->isDraft()
+            && ! $release->repository->owner->is($this->user())) {
+            throw (new AuthorizationException)->asNotFound();
+        }
+
+        parent::failedAuthorization();
     }
 
     protected function prepareForValidation(): void

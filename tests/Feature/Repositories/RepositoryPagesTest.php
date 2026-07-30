@@ -77,7 +77,8 @@ test('owner repository pages provide essential props and authorized action flags
             ->where('actions.canUpdate', true)
             ->where('actions.canArchive', true)
             ->where('actions.canRestore', false)
-            ->where('actions.canDelete', true),
+            ->where('actions.canDelete', true)
+            ->where('actions.canCreateRelease', true),
         );
 });
 
