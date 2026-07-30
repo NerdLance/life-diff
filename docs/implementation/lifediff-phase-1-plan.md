@@ -44,6 +44,10 @@ product implementation.
 
 ## Prompt sequence
 
+Current implementation status: framework-light domain primitives and the Phase
+1 schema migrations are complete. Models, factories, policies, requests,
+actions, routes, and product workflows remain pending.
+
 | Prompt | Scope and acceptance boundary                                                                                                                                                                                                      |
 | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1      | Correct identity and verification: authoritative-path decision, email-verification enforcement, profile-status enum, profile columns, normalized handle strategy, and `name`/`display_name` decision. No repositories or redesign. |
@@ -120,11 +124,12 @@ scope is explicitly amended:
 2. `name` and `display_name`: decide whether registration stores the same value
    in both fields and whether later profile edits keep them synchronized while
    retaining `name` for authentication compatibility.
-3. Repository name normalization: add a normalized-name column and owner-scoped
-   unique index (recommended) or document why slug uniqueness alone is enough.
-4. Soft-deleted release-version reuse: select a portable active-version strategy
-   after choosing the production database. Do not silently change the contract
-   phrase “unique among non-deleted releases.”
+3. Repository name normalization: resolved by the `normalized_name` column and
+   owner-scoped unique index. Later writes must populate the lowercased,
+   normalized value.
+4. Soft-deleted release-version reuse: resolved by the portable simple unique
+   `(repository_id, version)` index. Versions remain permanently reserved after
+   soft deletion; reuse requires an explicit future schema decision.
 5. Deployment database: local development uses MySQL 8.4, but confirm the
    deployed MySQL version, collation, strict-mode expectation, and connection
    configuration before relying on environment-specific behavior.

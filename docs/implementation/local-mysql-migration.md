@@ -33,8 +33,9 @@ method before treating local parity as complete.
 
 - `lifediff_local` and `lifediff_testing` are reachable through the dedicated
   local MySQL account. Credentials remain only in ignored local configuration.
-- The five existing Laravel migrations completed on `lifediff_local`, creating
-  the expected ten starter tables.
+- All nine current Laravel migrations completed on `lifediff_local`, creating
+  the expected thirteen tables, including the Phase 1 profile, repository,
+  release, and change-entry schema.
 - Laravel cache completed a reversible database-backed write/delete smoke check
   on MySQL.
 - The existing suite remains green: 39 tests and 136 assertions. It still uses
@@ -182,9 +183,10 @@ before domain migrations:
   enums.
 - Normalize handles and repository names in application-controlled columns; do
   not rely solely on collation for case-insensitive uniqueness.
-- Decide how active release-version uniqueness works with soft deletes. MySQL
-  does not provide a portable partial unique index, so select and test an
-  explicit strategy before creating the release migration.
+- Release versions use a portable unique `(repository_id, version)` index.
+  MySQL does not provide a portable partial unique index, so a soft-deleted
+  version remains reserved until an explicitly approved schema migration
+  changes that strategy.
 - Keep database constraints, foreign keys, indexes, transactions, and strict
   mode under MySQL coverage. Test visibility reduction and publication as
   transactions.
