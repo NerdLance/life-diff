@@ -24,7 +24,7 @@ followers, feeds, reactions, notifications, or other active users.
 | Publishing and published editing | Pass | Publication validates a non-empty entry list, visibility ceiling, version uniqueness, and repository state in one transaction. Published edits retain `published_at`, set `edited_at`, and preserve ordered entries. |
 | Private, unlisted, and public sharing | Pass | Policies, scopes, explicit serializers, and tests enforce owner-only drafts/private data, direct-link unlisted access, public listings, and 404 denials. |
 | History and stable links | Pass | Owner timelines show drafts and publications; public timelines show public publications only; `/r/{release:public_id}` survives handle/slug changes. |
-| Existing authentication/security | Pass after fix | Fortify registration, reset, verification, passkeys, two-factor, confirmation, and deletion remain present. Verified middleware now genuinely gates protected LifeDiff routes. |
+| Existing authentication/security | Pass with deployment exception | Fortify registration, reset, passkeys, two-factor, confirmation, and deletion remain present. Email verification is intentionally disabled until a transactional email provider is configured. |
 | Accessibility and responsive behavior | Pass | Labels, semantic landmarks, native radios/selects/buttons, keyboard move controls, predictable change-entry focus, destructive typed confirmation, visible focus treatment, plain-text rendering, and a 320px no-horizontal-overflow smoke check are present. |
 | Factories and development seed | Pass | Explicit valid states seed two fictional users, four repositories (private, unlisted, public, archived), one draft, six published releases spanning all release types, and all change types. |
 
@@ -123,10 +123,12 @@ Completed locally against MySQL with a fictional acceptance account:
 
 ### Blocking Phase 1 acceptance — fixed
 
-1. **Email verification was configured but not enforced.** `User` did not
-   implement `MustVerifyEmail`, so a newly registered user could reach the
-   protected dashboard. The model now implements the contract and a regression
-   test proves an unverified user is redirected to the verification prompt.
+1. **Email verification is intentionally disabled for test deployment.** The
+   Fortify feature, `MustVerifyEmail` model contract, verification routes, and
+   `verified` middleware gate are absent until a transactional email provider
+   is configured. A regression test confirms an unverified account can access
+   the authenticated dashboard. Re-enable this as a deliberate deployment
+   configuration change when outbound email is available.
 2. **The composer could warn while saving.** The unsaved-navigation guard was
    not exempting form submit/publish visits. It now permits those intentional
    visits, while retaining warnings for genuine navigation away.

@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::inertia('/', 'welcome')->name('home');
 
-Route::middleware(['auth', 'verified'])->group(function () {
+Route::middleware(['auth'])->group(function () {
     Route::get('dashboard', [DashboardController::class, 'show'])->name('dashboard');
 
     Route::get('repositories', [RepositoryController::class, 'index'])->name('repositories.index');

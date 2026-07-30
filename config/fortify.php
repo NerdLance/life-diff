@@ -163,7 +163,7 @@ return [
     'features' => [
         Features::registration(),
         Features::resetPasswords(),
-        Features::emailVerification(),
+        // Re-enable email verification when a transactional email provider is configured.
         Features::twoFactorAuthentication([
             'confirm' => true,
             'confirmPassword' => true,
