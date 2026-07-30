@@ -43,7 +43,7 @@ class ReleasePolicy
 
     public function update(User $user, Release $release): bool
     {
-        return $this->ownsWritableRelease($user, $release);
+        return $this->ownsWritableRelease($user, $release) && $release->isDraft();
     }
 
     public function publish(User $user, Release $release): bool
@@ -55,7 +55,7 @@ class ReleasePolicy
 
     public function delete(User $user, Release $release): bool
     {
-        return $this->ownsWritableRelease($user, $release);
+        return $this->ownsWritableRelease($user, $release) && $release->isDraft();
     }
 
     private function ownsWritableRelease(User $user, Release $release): bool

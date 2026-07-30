@@ -1,0 +1,210 @@
+<?php
+
+use App\Actions\Releases\SuggestReleaseVersion;
+use App\Enums\ChangeType;
+use App\Enums\ReleaseState;
+use App\Enums\ReleaseType;
+use App\Enums\RepositoryVisibility;
+use App\Models\ChangeEntry;
+use App\Models\Release;
+use App\Models\Repository;
+use App\Models\User;
+
+function releaseDraftPayload(array $overrides = []): array
+{
+    return [
+        'title' => 'A meaningful change',
+        'version' => '0.1.0',
+        'release_type' => ReleaseType::Patch->value,
+        'body' => 'A private draft body.',
+        'visibility' => RepositoryVisibility::Private->value,
+        'change_entries' => [],
+        ...$overrides,
+    ];
+}
+
+test('first release and every release type receive the contract version suggestion', function (): void {
+    $repository = Repository::factory()->create();
+    $suggest = app(SuggestReleaseVersion::class);
+
+    expect($suggest($repository, ReleaseType::Patch))->toBe('0.1.0');
+
+    Release::factory()->published()->for($repository)->create([
+        'version' => '2.4.7',
+        'published_at' => now(),
+    ]);
+    Release::factory()->draft()->for($repository)->create(['version' => '9.9.9']);
+
+    expect($suggest($repository, ReleaseType::Major))->toBe('3.0.0')
+        ->and($suggest($repository, ReleaseType::Minor))->toBe('2.5.0')
+        ->and($suggest($repository, ReleaseType::Patch))->toBe('2.4.8')
+        ->and($suggest($repository, ReleaseType::Hotfix))->toBe('2.4.8')
+        ->and($suggest($repository, ReleaseType::Experimental))->toBe('2.4.8')
+        ->and($suggest($repository, ReleaseType::Rollback))->toBe('2.4.8');
+
+    $this->actingAs($repository->owner)
+        ->get(route('repositories.releases.create', [
+            'repository' => $repository,
+            'release_type' => ReleaseType::Major->value,
+        ]))
+        ->assertSuccessful()
+        ->assertJsonPath('suggested_version', '3.0.0');
+});
+
+test('the draft create route supplies a server generated version suggestion', function (): void {
+    $owner = User::factory()->create();
+    $repository = Repository::factory()->for($owner, 'owner')->create();
+
+    $this->actingAs($owner)
+        ->get(route('repositories.releases.create', $repository))
+        ->assertSuccessful()
+        ->assertJsonPath('suggested_version', '0.1.0');
+});
+
+test('owners can create a draft with a manual normalized version and no entries', function (): void {
+    $owner = User::factory()->create();
+    $repository = Repository::factory()->public()->for($owner, 'owner')->create();
+
+    $this->actingAs($owner)
+        ->post(route('repositories.releases.store', $repository), releaseDraftPayload([
+            'version' => '01.002.0003',
+            'visibility' => RepositoryVisibility::Public->value,
+        ]))
+        ->assertRedirect(route('repositories.show', $repository));
+
+    $release = Release::query()->sole();
+
+    expect($release->version)->toBe('1.2.3')
+        ->and($release->state)->toBe(ReleaseState::Draft)
+        ->and($release->published_at)->toBeNull()
+        ->and($release->visibility)->toBe(RepositoryVisibility::Public)
+        ->and($release->changeEntries)->toHaveCount(0);
+});
+
+test('drafts synchronize multiple change entries in submitted order and remove empty rows', function (): void {
+    $owner = User::factory()->create();
+    $repository = Repository::factory()->for($owner, 'owner')->create();
+
+    $this->actingAs($owner)
+        ->post(route('repositories.releases.store', $repository), releaseDraftPayload([
+            'change_entries' => [
+                ['client_id' => 'first', 'change_type' => ChangeType::Added->value, 'content' => 'Started a routine.'],
+                ['client_id' => 'empty', 'change_type' => ChangeType::Fixed->value, 'content' => '   '],
+                ['client_id' => 'second', 'change_type' => ChangeType::KnownIssue->value, 'content' => 'Still learning what works.'],
+            ],
+        ]))
+        ->assertRedirect();
+
+    $release = Release::query()->sole();
+    $entries = $release->changeEntries()->get();
+
+    expect($entries)->toHaveCount(2)
+        ->and($entries->pluck('content')->all())->toBe(['Started a routine.', 'Still learning what works.'])
+        ->and($entries->pluck('sort_order')->all())->toBe([0, 1]);
+});
+
+test('owners can reorder and synchronize draft entries while preserving accepted IDs', function (): void {
+    $owner = User::factory()->create();
+    $repository = Repository::factory()->for($owner, 'owner')->create();
+    $release = Release::factory()->draft()->for($repository)->create();
+    $first = ChangeEntry::factory()->for($release)->create(['sort_order' => 0, 'content' => 'First']);
+    $second = ChangeEntry::factory()->for($release)->create(['sort_order' => 1, 'content' => 'Second']);
+
+    $this->actingAs($owner)
+        ->patch(route('releases.update', $release), releaseDraftPayload([
+            'version' => $release->version,
+            'change_entries' => [
+                ['id' => $second->id, 'client_id' => 'second', 'change_type' => ChangeType::Fixed->value, 'content' => 'Second, updated'],
+                ['id' => $first->id, 'client_id' => 'first', 'change_type' => ChangeType::Added->value, 'content' => 'First, updated'],
+            ],
+        ]))
+        ->assertRedirect(route('repositories.show', $repository));
+
+    expect($release->changeEntries()->pluck('id')->all())->toBe([$second->id, $first->id])
+        ->and($release->changeEntries()->pluck('sort_order')->all())->toBe([0, 1]);
+});
+
+test('change entry IDs from another release are rejected without altering the draft', function (): void {
+    $owner = User::factory()->create();
+    $repository = Repository::factory()->for($owner, 'owner')->create();
+    $release = Release::factory()->draft()->for($repository)->create();
+    $foreignEntry = ChangeEntry::factory()->for(Release::factory()->draft()->for($repository))->create();
+
+    $this->actingAs($owner)
+        ->from(route('releases.edit', $release))
+        ->patch(route('releases.update', $release), releaseDraftPayload([
+            'version' => $release->version,
+            'change_entries' => [
+                ['id' => $foreignEntry->id, 'client_id' => 'foreign', 'change_type' => ChangeType::Added->value, 'content' => 'Injected'],
+            ],
+        ]))
+        ->assertSessionHasErrors('change_entries.0.id');
+
+    expect($release->refresh()->changeEntries)->toHaveCount(0);
+});
+
+test('draft routes reject other users and guests', function (): void {
+    $owner = User::factory()->create();
+    $otherUser = User::factory()->create();
+    $repository = Repository::factory()->for($owner, 'owner')->create();
+    $release = Release::factory()->draft()->for($repository)->create();
+
+    $this->get(route('releases.edit', $release))
+        ->assertRedirect(route('login'));
+
+    $this->actingAs($otherUser)
+        ->get(route('releases.edit', $release))
+        ->assertNotFound();
+
+    $this->actingAs($otherUser)
+        ->post(route('repositories.releases.store', $repository), releaseDraftPayload())
+        ->assertForbidden();
+
+});
+
+test('archived repositories reject draft creation and updates', function (): void {
+    $owner = User::factory()->create();
+    $repository = Repository::factory()->archived()->for($owner, 'owner')->create();
+    $release = Release::factory()->draft()->for($repository)->create();
+
+    $this->actingAs($owner)
+        ->post(route('repositories.releases.store', $repository), releaseDraftPayload())
+        ->assertForbidden();
+
+    $this->actingAs($owner)
+        ->patch(route('releases.update', $release), releaseDraftPayload(['version' => $release->version]))
+        ->assertForbidden();
+});
+
+test('versions collide only within the same repository', function (): void {
+    $owner = User::factory()->create();
+    $repository = Repository::factory()->for($owner, 'owner')->create();
+    $otherRepository = Repository::factory()->for($owner, 'owner')->create();
+    Release::factory()->draft()->for($repository)->create(['version' => '1.2.3']);
+
+    $this->actingAs($owner)
+        ->from(route('repositories.releases.create', $repository))
+        ->post(route('repositories.releases.store', $repository), releaseDraftPayload(['version' => '1.2.3']))
+        ->assertSessionHasErrors('version');
+
+    $this->actingAs($owner)
+        ->post(route('repositories.releases.store', $otherRepository), releaseDraftPayload(['version' => '1.2.3']))
+        ->assertRedirect();
+});
+
+test('deleting a draft requires its typed title and soft deletes the release', function (): void {
+    $owner = User::factory()->create();
+    $repository = Repository::factory()->for($owner, 'owner')->create();
+    $release = Release::factory()->draft()->for($repository)->create(['title' => 'A meaningful change']);
+
+    $this->actingAs($owner)
+        ->delete(route('releases.destroy', $release), ['confirmation' => 'Wrong title'])
+        ->assertSessionHasErrors('confirmation');
+
+    $this->actingAs($owner)
+        ->delete(route('releases.destroy', $release), ['confirmation' => $release->title])
+        ->assertRedirect(route('repositories.show', $repository));
+
+    expect(Release::find($release->id))->toBeNull()
+        ->and(Release::withTrashed()->find($release->id)?->trashed())->toBeTrue();
+});
