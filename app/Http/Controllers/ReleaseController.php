@@ -43,6 +43,8 @@ class ReleaseController extends Controller
     {
         $createReleaseDraft($repository, $request->draftAttributes());
 
+        Inertia::flash('toast', ['type' => 'success', 'message' => __('Draft saved.')]);
+
         return to_route('repositories.show', $repository);
     }
 
@@ -75,6 +77,8 @@ class ReleaseController extends Controller
     public function update(UpdateReleaseRequest $request, Release $release, UpdateRelease $updateRelease): RedirectResponse
     {
         $release = $updateRelease($release, $request->releaseAttributes());
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => __('Release changes saved.')]);
 
         return to_route('releases.show', $release);
     }
@@ -132,6 +136,8 @@ class ReleaseController extends Controller
     {
         $repository = $release->repository;
         $deleteRelease($release);
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => __('Release deleted.')]);
 
         return to_route('repositories.show', $repository);
     }

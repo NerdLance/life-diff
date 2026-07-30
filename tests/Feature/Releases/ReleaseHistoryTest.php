@@ -44,7 +44,8 @@ test('public release detail has only safe props and preserves ordered plain text
     $first = ChangeEntry::factory()->for($release)->create(['sort_order' => 0, 'change_type' => ChangeType::Added, 'content' => 'First entry']);
     $second = ChangeEntry::factory()->for($release)->create(['sort_order' => 1, 'change_type' => ChangeType::KnownIssue, 'content' => 'Second entry']);
 
-    $this->get(route('public.releases.show', $release))
+    $this->actingAs(User::factory()->create())
+        ->get(route('public.releases.show', $release))
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->component('releases/public-show')
@@ -61,7 +62,8 @@ test('public release detail has only safe props and preserves ordered plain text
             ->missing('repository.visibility')
             ->missing('repository.public_id')
             ->missing('profile.email')
-            ->missing('actions'),
+            ->missing('actions')
+            ->where('auth.user', null),
         );
 });
 

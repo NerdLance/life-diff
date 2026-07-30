@@ -76,7 +76,7 @@ test('the draft create route supplies a server generated version suggestion', fu
 test('owners receive an editable composer with persisted entry identity and a suggestion', function (): void {
     $owner = User::factory()->create();
     $repository = Repository::factory()->for($owner, 'owner')->create();
-    $release = Release::factory()->draft()->for($repository)->create();
+    $release = Release::factory()->draft()->for($repository)->create(['version' => '2.3.4']);
     $entry = ChangeEntry::factory()->for($release)->create(['sort_order' => 0]);
 
     $this->actingAs($owner)
@@ -86,6 +86,7 @@ test('owners receive an editable composer with persisted entry identity and a su
             ->component('releases/edit')
             ->where('repository.public_id', $repository->public_id)
             ->where('release.public_id', $release->public_id)
+            ->where('release.version', '2.3.4')
             ->where('release.change_entries.0.id', $entry->id)
             ->where('release.change_entries.0.client_id', 'entry-'.$entry->id)
             ->where('suggestedVersion', '0.1.0'),

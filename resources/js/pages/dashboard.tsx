@@ -1,6 +1,10 @@
 import { Head, Link } from '@inertiajs/react';
 import { ArrowRight, FolderPlus } from 'lucide-react';
 import {
+    edit as editRelease,
+    show as showRelease,
+} from '@/actions/App/Http/Controllers/ReleaseController';
+import {
     create,
     index,
     show,
@@ -143,11 +147,11 @@ export default function Dashboard({
                     </section>
                 )}
 
-                {drafts.length > 0 && (
-                    <section className="space-y-4" aria-labelledby="drafts">
-                        <h2 id="drafts" className="text-lg font-semibold">
-                            Drafts needing continuation
-                        </h2>
+                <section className="space-y-4" aria-labelledby="drafts">
+                    <h2 id="drafts" className="text-lg font-semibold">
+                        Drafts needing continuation
+                    </h2>
+                    {drafts.length > 0 ? (
                         <div className="divide-y rounded-lg border border-border">
                             {drafts.map((release) => (
                                 <div
@@ -155,9 +159,14 @@ export default function Dashboard({
                                     className="flex flex-wrap items-center justify-between gap-3 p-4"
                                 >
                                     <div className="min-w-0">
-                                        <p className="truncate font-medium">
+                                        <Link
+                                            href={editRelease(
+                                                release.public_id,
+                                            )}
+                                            className="truncate rounded-sm font-medium hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                                        >
                                             {release.title}
-                                        </p>
+                                        </Link>
                                         <p className="text-sm text-muted-foreground">
                                             {release.repository.name} · updated{' '}
                                             {release.updated_at}
@@ -167,8 +176,13 @@ export default function Dashboard({
                                 </div>
                             ))}
                         </div>
-                    </section>
-                )}
+                    ) : (
+                        <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+                            No drafts are waiting. Start a release when you have
+                            something you want to return to.
+                        </p>
+                    )}
+                </section>
 
                 {recentPublishedReleases.length > 0 && (
                     <section
@@ -188,9 +202,14 @@ export default function Dashboard({
                                     className="flex flex-wrap items-center justify-between gap-3 p-4"
                                 >
                                     <div className="min-w-0">
-                                        <p className="truncate font-medium">
+                                        <Link
+                                            href={showRelease(
+                                                release.public_id,
+                                            )}
+                                            className="truncate rounded-sm font-medium hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                                        >
                                             {release.title}
-                                        </p>
+                                        </Link>
                                         <p className="text-sm text-muted-foreground">
                                             {release.repository.name} ·{' '}
                                             {release.published_at}

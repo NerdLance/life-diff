@@ -118,6 +118,7 @@ export default function ShowRelease({
                                                         <Input
                                                             id="confirmation"
                                                             name="confirmation"
+                                                            autoFocus
                                                             aria-invalid={Boolean(
                                                                 errors.confirmation,
                                                             )}

@@ -67,10 +67,10 @@ export function ReleaseComposer({
     const setFormData = form.setData;
 
     useEffect(() => {
-        if (!versionWasEdited.current) {
+        if (release.public_id === undefined && !versionWasEdited.current) {
             setFormData('version', suggestedVersion);
         }
-    }, [setFormData, suggestedVersion]);
+    }, [release.public_id, setFormData, suggestedVersion]);
 
     useEffect(() => {
         const warnBeforeUnload = (event: BeforeUnloadEvent): void => {
@@ -115,6 +115,7 @@ export function ReleaseComposer({
 
     function submit(event: React.FormEvent<HTMLFormElement>): void {
         event.preventDefault();
+        allowNavigation.current = true;
 
         if (method === 'post') {
             form.post(submitUrl);
@@ -127,6 +128,7 @@ export function ReleaseComposer({
 
     function publish(): void {
         if (publishUrl) {
+            allowNavigation.current = true;
             form.post(publishUrl);
         }
     }
